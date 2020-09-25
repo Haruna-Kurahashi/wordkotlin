@@ -1,54 +1,95 @@
 package app.kurahashi.kuppie.wordkotlin
 
 import android.os.Bundle
-import android.view.View
-import android.widget.AdapterView.OnItemClickListener
-import android.widget.AdapterView.OnItemLongClickListener
-import android.widget.ArrayAdapter
-import android.widget.ImageView
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.view.isVisible
+import androidx.recyclerview.widget.LinearLayoutManager
+import com.google.android.material.snackbar.Snackbar
+import io.realm.Realm
+import io.realm.kotlin.createObject
+import io.realm.kotlin.where
 import kotlinx.android.synthetic.main.activity_main.*
 
 class MainActivity : AppCompatActivity() {
+    val realm: Realm = Realm.getDefaultInstance()
+    var state: Int = 0
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        var adapter = ArrayAdapter<kotlin.Any?>(this, android.R.layout.simple_expandable_list_item_1)
-        var adapter2 = ArrayAdapter<kotlin.Any?>(this, android.R.layout.simple_expandable_list_item_1)
+        list1.layoutManager = LinearLayoutManager(this)
+        val word = realm.where<Word>().findAll()
+        val adapter = WordAdapter(word)
+        list1.adapter = adapter
+        var getId: Long = 0
 
-        listView1.setAdapter(adapter)
-        listView2.setAdapter(adapter2)
-
-        listView1.setOnItemClickListener{ parent, view, position, id ->
-            val adapter = listView1.getAdapter() as ArrayAdapter<*>
-            val item = adapter.getItem(position) as String?
-            adapter.remove(item as Nothing?)
-            adapter.add(item)
+        add1.setOnClickListener {
+            if(state == 0) {
+                realm.executeTransaction {
+                    val maxId = realm.where<Word>().max("id")
+                    val nextId = (maxId?.toLong() ?: 0L) + 1
+                    getId = nextId
+                    val word = realm.createObject<Word>(nextId)
+                    val text = editText1.text.toString()
+                    word.english = text
+                    state = 1
+                }
+            }else{
+                realm.executeTransaction {
+                    val word = realm.where<Word>().equalTo("id", getId)?.findFirst()
+                    val text = editText1.text.toString()
+                    if (word != null) {
+                        word.english = text
+                    }
+                    state = 0
+                }
+            }
+            Snackbar.make(conteiner, "追加しました", Snackbar.LENGTH_SHORT).show()
         }
 
-        listView2.onItemClickListener =
-            OnItemClickListener { parent, view, position, id ->
-                val adapter = listView2.adapter as ArrayAdapter<*>
-                val item = adapter.getItem(position) as String?
-                adapter.remove(item as Nothing?)
-                adapter.add(item)
+        add2.setOnClickListener {
+            if(state == 0){
+                realm.executeTransaction {
+                    val maxId = realm.where<Word>().max("id")
+                    val nextId = (maxId?.toLong() ?: 0L) + 1
+                    getId = nextId
+                    val word = realm.createObject<Word>(nextId)
+                    val text = editText2.text.toString()
+                    word.japanese = text
+                    state = 1
+                }
+            }else {
+                realm.executeTransaction {
+                    val word = realm.where<Word>().equalTo("id", getId)?.findFirst()
+                    val text = editText2.text.toString()
+                    if (word != null) {
+                        word.japanese = text
+                    }
+                    state = 0
+                }
             }
+            Snackbar.make(conteiner, "追加しました", Snackbar.LENGTH_SHORT).show()
+        }
 
-        listView1.setOnItemLongClickListener(OnItemLongClickListener { parent, view, position, id ->
-            val adapter = listView1.getAdapter() as ArrayAdapter<*>
-            val item = adapter.getItem(position) as String?
-            adapter.remove(item as Nothing?)
-            false
+        adapter.setOnItemClickListener(object : WordAdapter.OnItemClickListener {
+            override fun onItemClick(item: Word) {
+                // クリック時の処理
+                realm.executeTransaction {
+                    realm.where<Word>().equalTo("id", item.id)
+                        ?.findFirst()
+                        ?.deleteFromRealm()
+                }
+                Snackbar.make(conteiner, "削除しました", Snackbar.LENGTH_SHORT).show()
+            }
         })
+    }
 
-        listView2.onItemLongClickListener =
-            OnItemLongClickListener { parent, view, position, id ->
-                val adapter = listView2.adapter as ArrayAdapter<*>
-                val item = adapter.getItem(position) as String?
-                adapter.remove(item as Nothing?)
-                false
-            }
+    override fun onDestroy() {
+        super.onDestroy()
+        realm.close()
     }
 }
+
+
+
+
